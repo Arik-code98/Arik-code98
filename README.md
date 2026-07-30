@@ -42,7 +42,7 @@ Retrieval-augmented generation patterns and experiments.
 ## stats
 
 <p align="center">
-  <img src="assets/generated/details.svg" alt="Generated GitHub profile streak and language stats for Arik Chakraborty" width="1100" />
+  <img src="assets/generated/streaks.svg" alt="Generated GitHub profile streak and language stats for Arik Chakraborty" width="1100" />
 </p>
 
 ## about this page

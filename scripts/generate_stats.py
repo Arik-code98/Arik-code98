@@ -473,11 +473,11 @@ def generate_details_svg(repositories: list[dict], streaks: dict, contributions:
         f"GitHub detail stats for {LOGIN}",
         "A self-hosted panel showing streaks and language usage.",
     )
-    (OUTPUT_DIR / "details.svg").write_text(svg, encoding="utf-8")
+    (OUTPUT_DIR / "streaks.svg").write_text(svg, encoding="utf-8")
 
 
 def cleanup_old_assets() -> None:
-    for name in ("stats.svg", "streak.svg", "langs.svg", "year.svg"):
+    for name in ("stats.svg", "streak.svg", "details.svg", "langs.svg", "year.svg"):
         path = OUTPUT_DIR / name
         if path.exists():
             path.unlink()
