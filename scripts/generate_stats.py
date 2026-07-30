@@ -25,7 +25,6 @@ MUTED = "#8b949e"
 LINK = "#58a6ff"
 MONO = "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace"
 SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
-YEAR_RAMP = " .:+#@"
 
 FALLBACK_PROFILE = {
     "login": "Arik-code98",
@@ -419,10 +418,11 @@ def generate_hero_svg(profile: dict, repositories: list[dict], contributions: li
 
 def generate_details_svg(repositories: list[dict], streaks: dict, contributions: list[ContributionDay], language_bytes: Counter, repo_counts: Counter) -> None:
     width = 1100
-    height = 700
     last_active = next((item.day for item in reversed(contributions) if item.count > 0), None)
 
     top_bytes = language_bytes.most_common(5)
+    top_repo_counts = repo_counts.most_common(5)
+    height = 250 + max(3, len(top_bytes), len(top_repo_counts)) * 48
     total_bytes = sum(language_bytes.values()) or 1
     max_bytes = top_bytes[0][1] if top_bytes else 1
 
@@ -440,50 +440,13 @@ def generate_details_svg(repositories: list[dict], streaks: dict, contributions:
         )
 
     repo_lines: list[str] = []
-    for index, (language, count) in enumerate(repo_counts.most_common(5)):
+    for index, (language, count) in enumerate(top_repo_counts):
         y = 228 + index * 48
         repo_width = min(66, 20 + count * 7)
         repo_lines.append(
             f'<text x="850" y="{y}" fill="{TEXT}" font-size="18" font-family="{MONO}" font-weight="600">{escape(language.lower())}</text>'
             f'<rect x="982" y="{y - 11}" width="{repo_width}" height="12" rx="3" fill="{TEXT}" opacity="0.85" />'
             f'<text x="1080" y="{y}" fill="{MUTED}" font-size="16" text-anchor="end" font-family="{MONO}">{count}</text>'
-        )
-
-    counts = [item.count for item in contributions]
-    max_count = max(counts) if counts else 1
-    weeks: OrderedDict[date, list[str]] = OrderedDict()
-    for item in contributions:
-        week_start = item.day - timedelta(days=(item.day.weekday() + 1) % 7)
-        weeks.setdefault(week_start, [" "] * 7)
-        day_index = (item.day.weekday() + 1) % 7
-        glyph_index = 0 if item.count == 0 else max(1, round((item.count / max_count) * (len(YEAR_RAMP) - 1)))
-        weeks[week_start][day_index] = YEAR_RAMP[glyph_index]
-
-    heat_rows = []
-    labels = {1: "mon", 3: "wed", 5: "fri"}
-    for row_index in range(7):
-        row = "".join(column[row_index] for column in weeks.values())
-        label = labels.get(row_index, "   ")
-        heat_rows.append((label, row))
-
-    month_marks: list[str] = []
-    seen_months: set[str] = set()
-    start_x = 194
-    for col_index, week_start in enumerate(weeks.keys()):
-        label = week_start.strftime("%b").lower()
-        if label in seen_months:
-            continue
-        seen_months.add(label)
-        month_marks.append(
-            f'<text x="{start_x + col_index * 13.4:.2f}" y="482" fill="{MUTED}" font-size="14" font-family="{MONO}">{label}</text>'
-        )
-
-    heat_text = []
-    for row_index, (label, row) in enumerate(heat_rows):
-        y = 534 + row_index * 22
-        heat_text.append(
-            f'<text x="144" y="{y}" fill="{MUTED}" font-size="14" font-family="{MONO}">{label}</text>'
-            f'<text x="{start_x}" y="{y}" fill="{TEXT}" font-size="14" font-family="{MONO}" xml:space="preserve">{escape(row)}</text>'
         )
 
     body = f"""
@@ -501,12 +464,6 @@ def generate_details_svg(repositories: list[dict], streaks: dict, contributions:
   <text x="870" y="196" fill="{MUTED}" font-size="14" font-family="{MONO}" letter-spacing="1">BY REPOS</text>
   {''.join(bars)}
   {''.join(repo_lines)}
-
-  <text x="188" y="438" fill="{MUTED}" font-size="14" font-family="{MONO}" letter-spacing="1">THE YEAR</text>
-  <text x="188" y="462" fill="{MUTED}" font-size="14" font-family="{MONO}">{streaks["active_days"]} of 365 days had a contribution</text>
-  <text x="888" y="462" fill="{MUTED}" font-size="14" font-family="{MONO}">less  {YEAR_RAMP[0]} {YEAR_RAMP[1]} {YEAR_RAMP[2]} {YEAR_RAMP[3]} {YEAR_RAMP[4]} {YEAR_RAMP[5]}  more</text>
-  {''.join(month_marks)}
-  {''.join(heat_text)}
 """
 
     svg = build_card(
@@ -514,7 +471,7 @@ def generate_details_svg(repositories: list[dict], streaks: dict, contributions:
         height,
         body,
         f"GitHub detail stats for {LOGIN}",
-        "A self-hosted panel showing streaks, language usage, and a one-character-per-day contribution map.",
+        "A self-hosted panel showing streaks and language usage.",
     )
     (OUTPUT_DIR / "details.svg").write_text(svg, encoding="utf-8")
 
