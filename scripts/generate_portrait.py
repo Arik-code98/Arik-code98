@@ -11,13 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE_IMAGE = ROOT / "assets" / "source" / "portrait.jpeg"
 OUTPUT_SVG = ROOT / "assets" / "generated" / "portrait.svg"
 
-ASCII_RAMP = " .`:-=+*cs#%@"
-COLS = 90
-FONT_SIZE = 12.8
-CHAR_WIDTH = 7.42
-LINE_HEIGHT = 15.2
-PADDING_X = 28
-PADDING_Y = 24
+ASCII_RAMP = " .,:-=+*#%@"
+DEFAULT_COLS = 96
+MONO = "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace"
 
 
 def average(samples: Iterable[tuple[int, int, int]]) -> tuple[float, float, float]:
@@ -52,10 +48,7 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     rgb = image.convert("RGB")
     width, height = rgb.size
     scale = min(1.0, 420 / max(width, height))
-    if scale != 1.0:
-        probe = rgb.resize((int(width * scale), int(height * scale)), Image.Resampling.LANCZOS)
-    else:
-        probe = rgb
+    probe = rgb.resize((int(width * scale), int(height * scale)), Image.Resampling.LANCZOS) if scale != 1.0 else rgb
 
     probe_width, probe_height = probe.size
     background = sample_background_color(probe)
@@ -65,7 +58,7 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     def maybe_enqueue(x: int, y: int) -> None:
         if 0 <= x < probe_width and 0 <= y < probe_height and not visited[y][x]:
             pixel = probe.getpixel((x, y))
-            if color_distance(pixel, background) < 64:
+            if color_distance(pixel, background) < 62:
                 visited[y][x] = True
                 queue.append((x, y))
 
@@ -83,12 +76,7 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
         maybe_enqueue(x, y - 1)
         maybe_enqueue(x, y + 1)
 
-    subject_pixels: list[tuple[int, int]] = []
-    for y in range(probe_height):
-        for x in range(probe_width):
-            if not visited[y][x]:
-                subject_pixels.append((x, y))
-
+    subject_pixels = [(x, y) for y in range(probe_height) for x in range(probe_width) if not visited[y][x]]
     if not subject_pixels:
         return (0, 0, width, height)
 
@@ -97,14 +85,15 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     top = min(y for _, y in subject_pixels)
     bottom = max(y for _, y in subject_pixels)
 
-    expand_x = int((right - left + 1) * 0.16)
-    expand_top = int((bottom - top + 1) * 0.14)
-    expand_bottom = int((bottom - top + 1) * 0.10)
+    subject_width = right - left + 1
+    subject_height = bottom - top + 1
+    left = max(0, left - int(subject_width * 0.12))
+    right = min(probe_width - 1, right + int(subject_width * 0.12))
+    top = max(0, top - int(subject_height * 0.16))
 
-    left = max(0, left - expand_x)
-    right = min(probe_width - 1, right + expand_x)
-    top = max(0, top - expand_top)
-    bottom = min(probe_height - 1, bottom + expand_bottom)
+    # Tighten the lower crop so the face stays dominant instead of the suit.
+    face_bottom = top + int(subject_height * 0.70)
+    bottom = min(bottom, face_bottom, probe_height - 1)
 
     inv = 1 / scale
     return (
@@ -117,8 +106,7 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
 
 def preprocess_image(image_path: Path) -> Image.Image:
     image = Image.open(image_path).convert("RGB")
-    crop_box = find_subject_bbox(image)
-    cropped = image.crop(crop_box)
+    cropped = image.crop(find_subject_bbox(image))
 
     background = Image.new("RGB", cropped.size, (255, 255, 255))
     rgb = cropped.convert("RGB")
@@ -127,27 +115,28 @@ def preprocess_image(image_path: Path) -> Image.Image:
     for y in range(rgb.height):
         for x in range(rgb.width):
             pixel = rgb.getpixel((x, y))
-            if color_distance(pixel, bg_color) < 58 and y < int(rgb.height * 0.92):
+            if color_distance(pixel, bg_color) < 58 and y < int(rgb.height * 0.94):
                 pixels.append((255, 255, 255))
             else:
                 pixels.append(pixel)
     background.putdata(pixels)
 
     grayscale = ImageOps.grayscale(background)
+    grayscale = grayscale.filter(ImageFilter.GaussianBlur(radius=0.7))
     grayscale = ImageOps.autocontrast(grayscale, cutoff=1)
-    grayscale = grayscale.filter(ImageFilter.SMOOTH_MORE)
 
     def tone_curve(value: int) -> int:
         normalized = value / 255
-        curved = normalized ** 1.52
+        curved = normalized ** 1.7
         return int(curved * 255)
 
     return grayscale.point(tone_curve)
 
 
-def image_to_ascii_rows(image: Image.Image, cols: int = COLS) -> list[str]:
+def build_ascii_rows(image_path: Path = SOURCE_IMAGE, cols: int = DEFAULT_COLS) -> list[str]:
+    image = preprocess_image(image_path)
     width, height = image.size
-    rows = max(32, int(cols * (height / width) * 0.54))
+    rows = max(34, int(cols * (height / width) * 0.48))
     sampled = image.resize((cols, rows), Image.Resampling.LANCZOS)
 
     lines: list[str] = []
@@ -161,52 +150,81 @@ def image_to_ascii_rows(image: Image.Image, cols: int = COLS) -> list[str]:
     return lines
 
 
-def build_svg(rows: list[str]) -> str:
-    max_cols = max(len(row) for row in rows)
-    body_width = max_cols * CHAR_WIDTH
-    body_height = len(rows) * LINE_HEIGHT
-    width = int(body_width + PADDING_X * 2)
-    height = int(body_height + PADDING_Y * 2 + 16)
-
+def render_ascii_layers(
+    rows: list[str],
+    *,
+    x: float,
+    y: float,
+    font_size: float,
+    char_width: float,
+    line_height: float,
+    color: str,
+    cursor_color: str,
+    animate: bool,
+) -> tuple[str, str, float, float]:
     defs: list[str] = []
-    content: list[str] = []
-    cursor_color = "#d49a66"
-    ink = "#f7e7d6"
-    muted = "#aa8b71"
+    body: list[str] = []
+    max_cols = max(len(row) for row in rows) if rows else 0
+    total_width = max_cols * char_width
+    total_height = len(rows) * line_height
 
     for index, row in enumerate(rows):
-        row_width = max(6, len(row) * CHAR_WIDTH)
-        y = PADDING_Y + (index + 1) * LINE_HEIGHT
-        begin = index * 0.08
-        duration = 0.24
-        clip_id = f"line-{index}"
-        defs.append(
-            f"""
+        row_width = max(6.0, len(row) * char_width)
+        row_y = y + (index + 1) * line_height
+        if animate:
+            begin = index * 0.09
+            duration = 0.22
+            clip_id = f"line-{index}"
+            defs.append(
+                f"""
     <clipPath id="{clip_id}">
-      <rect x="{PADDING_X}" y="{y - LINE_HEIGHT + 3:.2f}" width="0" height="{LINE_HEIGHT:.2f}" rx="2">
+      <rect x="{x:.2f}" y="{row_y - line_height + 2:.2f}" width="0" height="{line_height:.2f}">
         <animate attributeName="width" from="0" to="{row_width:.2f}" begin="{begin:.2f}s" dur="{duration:.2f}s" fill="freeze" />
       </rect>
     </clipPath>"""
-        )
-        content.append(
-            f"""
-  <text xml:space="preserve" x="{PADDING_X}" y="{y:.2f}" clip-path="url(#{clip_id})">{escape(row)}</text>
-  <rect x="{PADDING_X}" y="{y - LINE_HEIGHT + 4:.2f}" width="8" height="{LINE_HEIGHT - 3:.2f}" rx="1.5" fill="{cursor_color}" opacity="0.88">
-    <animate attributeName="x" from="{PADDING_X}" to="{PADDING_X + row_width:.2f}" begin="{begin:.2f}s" dur="{duration:.2f}s" fill="freeze" />
+            )
+            body.append(
+                f"""
+  <text xml:space="preserve" x="{x:.2f}" y="{row_y:.2f}" clip-path="url(#{clip_id})">{escape(row)}</text>
+  <rect x="{x:.2f}" y="{row_y - line_height + 3:.2f}" width="{max(5.0, char_width * 0.92):.2f}" height="{line_height - 2:.2f}" fill="{cursor_color}" opacity="0.92">
+    <animate attributeName="x" from="{x:.2f}" to="{x + row_width:.2f}" begin="{begin:.2f}s" dur="{duration:.2f}s" fill="freeze" />
     <set attributeName="opacity" to="0" begin="{begin + duration:.2f}s" />
   </rect>"""
-        )
+            )
+        else:
+            body.append(f'\n  <text xml:space="preserve" x="{x:.2f}" y="{row_y:.2f}">{escape(row)}</text>')
 
+    group = (
+        f'<g fill="{color}" font-size="{font_size}" '
+        f'font-family="{MONO}" letter-spacing="0">{ "".join(body) }\n</g>'
+    )
+    return "".join(defs), group, total_width, total_height
+
+
+def build_svg(rows: list[str]) -> str:
+    font_size = 10.4
+    char_width = 6.15
+    line_height = 11.9
+    defs, portrait, total_width, total_height = render_ascii_layers(
+        rows,
+        x=28,
+        y=22,
+        font_size=font_size,
+        char_width=char_width,
+        line_height=line_height,
+        color="#e6edf3",
+        cursor_color="#c9d1d9",
+        animate=True,
+    )
+    width = int(total_width + 56)
+    height = int(total_height + 46)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">
   <title id="title">Animated ASCII portrait of Arik Chakraborty</title>
   <desc id="desc">A self-typing monochrome portrait rendered from ASCII characters.</desc>
-  <defs>{''.join(defs)}
+  <defs>{defs}
   </defs>
-  <rect width="{width}" height="{height}" rx="22" fill="#130f0c" />
-  <rect x="1" y="1" width="{width - 2}" height="{height - 2}" rx="21" fill="none" stroke="#2d221c" />
-  <text x="{PADDING_X}" y="16" fill="{muted}" font-size="10.5" font-family="'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace" letter-spacing="1.2">PROFILE.PORTRAIT / AUTO-GENERATED</text>
-  <g fill="{ink}" font-size="{FONT_SIZE}" font-family="'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace">{''.join(content)}
-  </g>
+  <rect width="{width}" height="{height}" rx="16" fill="#0d1117" />
+  {portrait}
 </svg>
 """
 
@@ -214,12 +232,10 @@ def build_svg(rows: list[str]) -> str:
 def main() -> None:
     if not SOURCE_IMAGE.exists():
         raise FileNotFoundError(f"Missing portrait source: {SOURCE_IMAGE}")
-    processed = preprocess_image(SOURCE_IMAGE)
-    rows = image_to_ascii_rows(processed)
+    rows = build_ascii_rows()
     OUTPUT_SVG.write_text(build_svg(rows), encoding="utf-8")
     print(f"Wrote {OUTPUT_SVG}")
 
 
 if __name__ == "__main__":
     main()
-

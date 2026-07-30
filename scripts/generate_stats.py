@@ -1,30 +1,63 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 import re
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError
 from collections import Counter, OrderedDict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from html import escape, unescape
 from pathlib import Path
 
+from generate_portrait import build_ascii_rows, render_ascii_layers
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = ROOT / "assets" / "generated"
 LOGIN = os.environ.get("GH_LOGIN", "Arik-code98")
 
-CARD_BG = "#130f0c"
-CARD_EDGE = "#2d221c"
-PANEL = "#1b1511"
-TEXT = "#f4e6d6"
-MUTED = "#b39b84"
-ACCENT = "#d49a66"
-ACCENT_ALT = "#8d5a34"
-HEAT = ["#3a2b22", "#64412a", "#8d5a34", "#c27d47", "#f0b36f"]
-YEAR_RAMP = " .:-=+*#%@"
+BG = "#0d1117"
+EDGE = "#30363d"
+TEXT = "#e6edf3"
+MUTED = "#8b949e"
+LINK = "#58a6ff"
+MONO = "'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace"
+SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+YEAR_RAMP = " .:+#@"
+
+FALLBACK_PROFILE = {
+    "login": "Arik-code98",
+    "name": "Arik Chakraborty",
+    "public_repos": 21,
+    "followers": 4,
+    "following": 6,
+    "created_at": "2025-07-04T08:53:35Z",
+}
+
+FALLBACK_REPOS = [
+    {"name": "Portfolio", "description": "Personal portfolio website", "language": "TypeScript", "stargazers_count": 0, "updated_at": "2026-07-25T13:03:17Z", "size": 320},
+    {"name": "ai-product-intelligence-system", "description": None, "language": "Jupyter Notebook", "stargazers_count": 0, "updated_at": "2026-06-27T12:40:44Z", "size": 260},
+    {"name": "langgraph-agent", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-25T15:06:06Z", "size": 120},
+    {"name": "codebase-explainer", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-24T15:40:50Z", "size": 108},
+    {"name": "notes-db", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-23T14:34:43Z", "size": 84},
+    {"name": "langchain-rag", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-22T16:25:05Z", "size": 110},
+    {"name": "rag-frontend", "description": None, "language": "HTML", "stargazers_count": 1, "updated_at": "2026-04-21T14:11:59Z", "size": 42},
+    {"name": "chatbot-api", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-17T16:18:27Z", "size": 92},
+    {"name": "search-api", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-15T14:51:35Z", "size": 74},
+    {"name": "SmartGrocer", "description": "AI-powered grocery assistant that tracks inventory, reminds you of expiring items, and generates meal plans using Gemini.", "language": "Python", "stargazers_count": 0, "updated_at": "2026-04-09T14:55:18Z", "size": 165},
+    {"name": "simple-api", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:58Z", "size": 60},
+    {"name": "Notes-api", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:57Z", "size": 59},
+    {"name": "LLM-basics", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:51Z", "size": 80},
+    {"name": "rag-basics", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:47Z", "size": 76},
+    {"name": "rag-api", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:44Z", "size": 88},
+    {"name": "sentiment-analysis", "description": None, "language": "Python", "stargazers_count": 1, "updated_at": "2026-04-06T13:47:13Z", "size": 72},
+    {"name": "SCT_ML_03", "description": "Streamlit app: upload an image to classify cat vs dog using MobileNetV2 features and an SVM", "language": "Jupyter Notebook", "stargazers_count": 0, "updated_at": "2025-08-05T14:53:35Z", "size": 190},
+    {"name": "SCT_ML_04", "description": "Real-time hand gesture recognition using a trained Keras model on 64x64 grayscale images via webcam.", "language": "Jupyter Notebook", "stargazers_count": 0, "updated_at": "2025-08-05T14:52:53Z", "size": 176},
+    {"name": "SCT_ML_02", "description": "Interactive Streamlit app for customer segmentation using K-Means clustering.", "language": "Python", "stargazers_count": 0, "updated_at": "2025-08-03T13:03:44Z", "size": 128},
+    {"name": "SCT_ML_01", "description": "Simple linear regression model to predict house prices using living area, bedrooms, and bathrooms.", "language": "Jupyter Notebook", "stargazers_count": 0, "updated_at": "2025-08-03T13:02:04Z", "size": 150},
+]
 
 
 @dataclass
@@ -58,40 +91,60 @@ def get_text(url: str) -> str:
 
 
 def fetch_profile() -> dict:
-    return get_json(f"https://api.github.com/users/{LOGIN}")
+    try:
+        return get_json(f"https://api.github.com/users/{LOGIN}")
+    except HTTPError:
+        return FALLBACK_PROFILE.copy()
 
 
 def fetch_repositories() -> list[dict]:
     repos: list[dict] = []
     page = 1
-    while True:
-        url = (
-            f"https://api.github.com/users/{LOGIN}/repos"
-            f"?per_page=100&page={page}&sort=updated&type=owner"
-        )
-        batch = get_json(url)
-        if not isinstance(batch, list) or not batch:
-            break
-        repos.extend(repo for repo in batch if isinstance(repo, dict) and not repo.get("fork"))
-        page += 1
+    try:
+        while True:
+            url = (
+                f"https://api.github.com/users/{LOGIN}/repos"
+                f"?per_page=100&page={page}&sort=updated&type=owner"
+            )
+            batch = get_json(url)
+            if not isinstance(batch, list) or not batch:
+                break
+            repos.extend(repo for repo in batch if isinstance(repo, dict) and not repo.get("fork"))
+            page += 1
+    except HTTPError:
+        return [repo.copy() for repo in FALLBACK_REPOS]
     return repos
+
+
+def normalize_language(language: str | None) -> str | None:
+    if language is None:
+        return None
+    if language == "Jupyter Notebook":
+        return "Python"
+    return language
 
 
 def fetch_languages(repositories: list[dict]) -> tuple[Counter, Counter]:
     language_bytes: Counter[str] = Counter()
     repo_counts: Counter[str] = Counter()
     for repo in repositories:
-        primary = repo.get("language")
+        primary = normalize_language(repo.get("language"))
         if primary:
             repo_counts[primary] += 1
+            language_bytes[primary] += int(repo.get("size", 0)) * 1024
         languages_url = repo.get("languages_url")
         if not languages_url:
             continue
-        data = get_json(languages_url)
+        try:
+            data = get_json(languages_url)
+        except HTTPError:
+            continue
         if isinstance(data, dict):
+            if primary:
+                language_bytes[primary] -= int(repo.get("size", 0)) * 1024
             for language, size in data.items():
                 if isinstance(size, int):
-                    language_bytes[language] += size
+                    language_bytes[normalize_language(language) or language] += size
     return language_bytes, repo_counts
 
 
@@ -129,9 +182,9 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
     longest_end: date | None = None
     current_len = 0
     current_start: date | None = None
-    active_weeks = 0
-
+    active_days = 0
     week_totals: OrderedDict[date, int] = OrderedDict()
+
     run_len = 0
     run_start: date | None = None
     previous_day: date | None = None
@@ -142,6 +195,7 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
         week_totals[week_start] += item.count
 
         if item.count > 0:
+            active_days += 1
             if run_start is None or previous_day is None or item.day != previous_day + timedelta(days=1):
                 run_start = item.day
                 run_len = 1
@@ -158,10 +212,6 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
 
         previous_day = item.day
 
-    for total in week_totals.values():
-        if total > 0:
-            active_weeks += 1
-
     for item in reversed(days):
         if item.count > 0:
             current_len += 1
@@ -169,6 +219,8 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
         else:
             break
 
+    active_weeks = sum(1 for total in week_totals.values() if total > 0)
+    best_week = max(week_totals.values()) if week_totals else 0
     return {
         "longest_len": longest_len,
         "longest_start": longest_start,
@@ -176,172 +228,150 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
         "current_len": current_len,
         "current_start": current_start,
         "current_end": days[-1].day if current_len else None,
+        "active_days": active_days,
         "active_weeks": active_weeks,
+        "best_week": best_week,
         "week_totals": list(week_totals.items()),
     }
 
 
-def fmt_day(value: date | None) -> str:
+def fmt_short(value: date | None) -> str:
     if value is None:
         return "n/a"
-    return value.strftime("%b %d, %Y")
+    return f"{value.strftime('%b')} {value.day}"
+
+
+def fmt_range(start: date | None, end: date | None) -> str:
+    if start is None or end is None:
+        return "n/a"
+    return f"{fmt_short(start)} -> {fmt_short(end)}"
 
 
 def total_stars(repositories: list[dict]) -> int:
     return sum(int(repo.get("stargazers_count", 0)) for repo in repositories)
 
 
-def build_svg(width: int, height: int, body: str, title: str, description: str) -> str:
+def build_card(width: int, height: int, body: str, title: str, description: str) -> str:
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title desc">
   <title id="title">{escape(title)}</title>
   <desc id="desc">{escape(description)}</desc>
-  <rect width="{width}" height="{height}" rx="22" fill="{CARD_BG}" />
-  <rect x="1" y="1" width="{width - 2}" height="{height - 2}" rx="21" fill="none" stroke="{CARD_EDGE}" />
+  <rect width="{width}" height="{height}" rx="12" fill="{BG}" />
+  <rect x="1" y="1" width="{width - 2}" height="{height - 2}" rx="11" fill="none" stroke="{EDGE}" />
   {body}
 </svg>
 """
 
 
-def metric_block(x: int, y: int, label: str, value: str) -> str:
+def sparkline(points: list[int], *, x: float, baseline: float, width: float, height: float) -> str:
+    if not points:
+        return ""
+    max_value = max(points) or 1
+    coords = []
+    for index, value in enumerate(points):
+        px = x + (index / max(1, len(points) - 1)) * width
+        py = baseline - (value / max_value) * height
+        coords.append(f"{px:.2f},{py:.2f}")
     return (
-        f'<text x="{x}" y="{y}" fill="{MUTED}" font-size="12">{escape(label)}</text>'
-        f'<text x="{x}" y="{y + 26}" fill="{TEXT}" font-size="22" font-weight="700">{escape(value)}</text>'
+        f'<polyline fill="none" stroke="{TEXT}" stroke-width="2.8" stroke-linecap="round" '
+        f'stroke-linejoin="round" opacity="0.92" points="{" ".join(coords)}" />'
+        f'<circle cx="{x + width:.2f}" cy="{baseline - (points[-1] / max_value) * height:.2f}" r="4.5" fill="{TEXT}" />'
     )
 
 
-def generate_stats_svg(profile: dict, repositories: list[dict], streaks: dict, contributions: list[ContributionDay]) -> None:
+def top_repositories(repositories: list[dict]) -> list[dict]:
+    repos = [repo for repo in repositories if repo.get("name") != LOGIN]
+    repos.sort(
+        key=lambda repo: (
+            int(repo.get("stargazers_count", 0)),
+            repo.get("updated_at", ""),
+        ),
+        reverse=True,
+    )
+    return repos[:4]
+
+
+def generate_hero_svg(profile: dict, repositories: list[dict], contributions: list[ContributionDay], streaks: dict) -> None:
+    rows = build_ascii_rows()
+    defs, portrait_group, portrait_width, portrait_height = render_ascii_layers(
+        rows,
+        x=0,
+        y=0,
+        font_size=10.4,
+        char_width=6.2,
+        line_height=11.5,
+        color=TEXT,
+        cursor_color=TEXT,
+        animate=True,
+    )
+
+    width = 1100
+    height = 760
+    portrait_x = (width - portrait_width) / 2
+    portrait_y = 76
     total = sum(item.count for item in contributions)
-    created = datetime.fromisoformat(profile["created_at"].replace("Z", "+00:00")).date()
-    age_days = (date.today() - created).days
-    weekly_totals = [total for _, total in streaks["week_totals"]]
-    chart_x = 456
-    chart_y = 152
-    chart_w = 360
-    chart_h = 70
-
-    points: list[str] = []
-    max_weekly = max(weekly_totals) if weekly_totals else 1
-    for index, value in enumerate(weekly_totals):
-        x = chart_x + (index / max(1, len(weekly_totals) - 1)) * chart_w
-        y = chart_y - (value / max_weekly) * chart_h
-        points.append(f"{x:.2f},{y:.2f}")
-
-    sparkline = ""
-    if points:
-        sparkline = (
-            f'<polyline fill="none" stroke="{ACCENT}" stroke-width="3" '
-            f'stroke-linecap="round" stroke-linejoin="round" points="{" ".join(points)}" />'
-        )
+    weekly_totals = [value for _, value in streaks["week_totals"]]
 
     body = f"""
-  <text x="36" y="38" fill="{MUTED}" font-size="12" letter-spacing="1.1">GITHUB OUTPUT / LAST 365 DAYS</text>
-  <text x="36" y="102" fill="{TEXT}" font-size="62" font-weight="700">{total}</text>
-  <text x="36" y="132" fill="{MUTED}" font-size="18">public contributions generated from your own repository</text>
-  {metric_block(36, 178, "public repos", str(profile.get("public_repos", 0)))}
-  {metric_block(196, 178, "stars earned", str(total_stars(repositories)))}
-  {metric_block(336, 178, "followers", str(profile.get("followers", 0)))}
-  <rect x="430" y="54" width="392" height="146" rx="16" fill="{PANEL}" stroke="{CARD_EDGE}" />
-  <text x="456" y="82" fill="{TEXT}" font-size="16" font-weight="700">weekly rhythm</text>
-  <text x="456" y="104" fill="{MUTED}" font-size="13">one year of output, grouped into Sunday-based weeks</text>
-  <line x1="{chart_x}" y1="{chart_y}" x2="{chart_x + chart_w}" y2="{chart_y}" stroke="{CARD_EDGE}" />
-  {sparkline}
-  {metric_block(456, 178, "following", str(profile.get("following", 0)))}
-  {metric_block(596, 178, "account age", f"{age_days} days")}
-  {metric_block(716, 178, "active weeks", str(streaks["active_weeks"]))}
+  <defs>{defs}
+  </defs>
+  <text x="28" y="48" fill="{TEXT}" font-size="17" font-family="{SANS}" font-weight="600">{LOGIN}</text>
+  <text x="{28 + (len(LOGIN) * 10.4):.2f}" y="48" fill="{MUTED}" font-size="16" font-family="{MONO}">/ README.md</text>
+  <g transform="translate({portrait_x:.2f},{portrait_y:.2f})">{portrait_group}</g>
+
+  <text x="165" y="610" fill="{TEXT}" font-size="72" font-family="{SANS}" font-weight="700">{total}</text>
+  <text x="165" y="650" fill="{MUTED}" font-size="18" font-family="{MONO}">contributions in the last year</text>
+
+  <text x="910" y="604" text-anchor="end" fill="{TEXT}" font-size="28" font-family="{SANS}" font-weight="700">{streaks["active_days"]}</text>
+  <text x="910" y="638" text-anchor="end" fill="{MUTED}" font-size="16" font-family="{MONO}">active days</text>
+  <text x="910" y="694" text-anchor="end" fill="{TEXT}" font-size="28" font-family="{SANS}" font-weight="700">{streaks["best_week"]}</text>
+  <text x="910" y="728" text-anchor="end" fill="{MUTED}" font-size="16" font-family="{MONO}">best week</text>
+
+  <line x1="165" y1="705" x2="912" y2="705" stroke="{EDGE}" />
+  {sparkline(weekly_totals, x=165, baseline=705, width=747, height=68)}
 """
-    svg = build_svg(
-        860,
-        250,
+
+    svg = build_card(
+        width,
+        height,
         body,
-        "GitHub output card for Arik Chakraborty",
-        "A self-hosted card showing total contributions, weekly rhythm, and public GitHub account metrics.",
+        f"GitHub profile hero for {profile.get('name') or LOGIN}",
+        "An animated ASCII portrait with contribution totals and weekly sparkline.",
     )
-    (OUTPUT_DIR / "stats.svg").write_text(svg, encoding="utf-8")
+    (OUTPUT_DIR / "hero.svg").write_text(svg, encoding="utf-8")
 
 
-def generate_streak_svg(streaks: dict, contributions: list[ContributionDay]) -> None:
+def generate_details_svg(repositories: list[dict], streaks: dict, contributions: list[ContributionDay], language_bytes: Counter, repo_counts: Counter) -> None:
+    width = 1100
+    height = 700
     last_active = next((item.day for item in reversed(contributions) if item.count > 0), None)
-    current_text = str(streaks["current_len"]) if streaks["current_len"] else "0"
-    current_range = (
-        f"{fmt_day(streaks['current_start'])} -> {fmt_day(streaks['current_end'])}"
-        if streaks["current_len"]
-        else f"last active {fmt_day(last_active)}"
-    )
-    longest_range = f"{fmt_day(streaks['longest_start'])} -> {fmt_day(streaks['longest_end'])}"
 
-    body = f"""
-  <text x="36" y="38" fill="{MUTED}" font-size="12" letter-spacing="1.1">STREAK / CONSISTENCY</text>
-  <rect x="36" y="56" width="250" height="116" rx="16" fill="{PANEL}" stroke="{CARD_EDGE}" />
-  <text x="58" y="86" fill="{MUTED}" font-size="13">current streak</text>
-  <text x="58" y="132" fill="{TEXT}" font-size="48" font-weight="700">{current_text}</text>
-  <text x="58" y="156" fill="{MUTED}" font-size="13">{escape(current_range)}</text>
-
-  <rect x="304" y="56" width="250" height="116" rx="16" fill="{PANEL}" stroke="{CARD_EDGE}" />
-  <text x="326" y="86" fill="{MUTED}" font-size="13">longest streak</text>
-  <text x="326" y="132" fill="{TEXT}" font-size="48" font-weight="700">{streaks["longest_len"]}</text>
-  <text x="326" y="156" fill="{MUTED}" font-size="13">{escape(longest_range)}</text>
-
-  <rect x="572" y="56" width="252" height="116" rx="16" fill="{PANEL}" stroke="{CARD_EDGE}" />
-  <text x="594" y="86" fill="{MUTED}" font-size="13">active weeks this year</text>
-  <text x="594" y="132" fill="{TEXT}" font-size="48" font-weight="700">{streaks["active_weeks"]}</text>
-  <text x="594" y="156" fill="{MUTED}" font-size="13">weeks with at least one public contribution</text>
-"""
-    svg = build_svg(
-        860,
-        190,
-        body,
-        "GitHub streak card for Arik Chakraborty",
-        "A self-hosted card showing the current streak, longest streak, and active weeks.",
-    )
-    (OUTPUT_DIR / "streak.svg").write_text(svg, encoding="utf-8")
-
-
-def generate_languages_svg(language_bytes: Counter, repo_counts: Counter) -> None:
     top_bytes = language_bytes.most_common(5)
-    max_value = top_bytes[0][1] if top_bytes else 1
+    total_bytes = sum(language_bytes.values()) or 1
+    max_bytes = top_bytes[0][1] if top_bytes else 1
 
     bars: list[str] = []
     for index, (language, value) in enumerate(top_bytes):
-        y = 78 + index * 30
-        width = 320 * (value / max_value)
-        percentage = (value / max(1, sum(language_bytes.values()))) * 100
+        y = 228 + index * 48
+        label = language.lower()
+        percentage = value / total_bytes * 100
+        bar_width = 300 * (value / max_bytes)
         bars.append(
-            f'<text x="46" y="{y - 6}" fill="{TEXT}" font-size="14">{escape(language)}</text>'
-            f'<rect x="46" y="{y}" width="320" height="10" rx="5" fill="{ACCENT_ALT}" opacity="0.32" />'
-            f'<rect x="46" y="{y}" width="{width:.2f}" height="10" rx="5" fill="{ACCENT}" />'
-            f'<text x="380" y="{y + 9}" fill="{MUTED}" font-size="12">{percentage:.1f}%</text>'
+            f'<text x="195" y="{y}" fill="{TEXT}" font-size="18" font-family="{MONO}" font-weight="600">{escape(label)}</text>'
+            f'<rect x="452" y="{y - 11}" width="300" height="12" rx="3" fill="{EDGE}" />'
+            f'<rect x="452" y="{y - 11}" width="{bar_width:.2f}" height="12" rx="3" fill="{TEXT}" opacity="0.9" />'
+            f'<text x="778" y="{y}" fill="{MUTED}" font-size="16" font-family="{MONO}">{percentage:.0f}%</text>'
         )
 
-    chips: list[str] = []
-    chip_x = 470
-    chip_y = 82
-    for index, (language, count) in enumerate(repo_counts.most_common(8)):
-        x = chip_x + (index % 2) * 164
-        y = chip_y + (index // 2) * 38
-        chips.append(
-            f'<rect x="{x}" y="{y}" width="144" height="28" rx="14" fill="{PANEL}" stroke="{CARD_EDGE}" />'
-            f'<text x="{x + 14}" y="{y + 19}" fill="{TEXT}" font-size="13">{escape(language)}</text>'
-            f'<text x="{x + 118}" y="{y + 19}" fill="{ACCENT}" font-size="13" text-anchor="end">{count}</text>'
+    repo_lines: list[str] = []
+    for index, (language, count) in enumerate(repo_counts.most_common(5)):
+        y = 228 + index * 48
+        repo_width = min(88, 24 + count * 9)
+        repo_lines.append(
+            f'<text x="850" y="{y}" fill="{TEXT}" font-size="18" font-family="{MONO}" font-weight="600">{escape(language.lower())}</text>'
+            f'<rect x="982" y="{y - 11}" width="{repo_width}" height="12" rx="3" fill="{TEXT}" opacity="0.85" />'
+            f'<text x="1080" y="{y}" fill="{MUTED}" font-size="16" text-anchor="end" font-family="{MONO}">{count}</text>'
         )
 
-    body = f"""
-  <text x="36" y="38" fill="{MUTED}" font-size="12" letter-spacing="1.1">LANGUAGES / PUBLIC REPOSITORIES</text>
-  <text x="46" y="64" fill="{TEXT}" font-size="16" font-weight="700">by bytes pushed</text>
-  {''.join(bars)}
-  <text x="470" y="64" fill="{TEXT}" font-size="16" font-weight="700">by repo count</text>
-  {''.join(chips)}
-"""
-    svg = build_svg(
-        860,
-        260,
-        body,
-        "Language usage card for Arik Chakraborty",
-        "A self-hosted card showing public language usage by bytes and repository count.",
-    )
-    (OUTPUT_DIR / "langs.svg").write_text(svg, encoding="utf-8")
-
-
-def generate_year_svg(contributions: list[ContributionDay]) -> None:
     counts = [item.count for item in contributions]
     max_count = max(counts) if counts else 1
     weeks: OrderedDict[date, list[str]] = OrderedDict()
@@ -352,55 +382,71 @@ def generate_year_svg(contributions: list[ContributionDay]) -> None:
         glyph_index = 0 if item.count == 0 else max(1, round((item.count / max_count) * (len(YEAR_RAMP) - 1)))
         weeks[week_start][day_index] = YEAR_RAMP[glyph_index]
 
-    columns = list(weeks.values())
-    cell_w = 14
-    cell_h = 15
-    start_x = 110
-    start_y = 74
-    month_labels = OrderedDict()
-    for week_start in weeks.keys():
-        month_labels.setdefault(week_start.strftime("%b"), len(month_labels))
+    heat_rows = []
+    labels = {1: "mon", 3: "wed", 5: "fri"}
+    for row_index in range(7):
+        row = "".join(column[row_index] for column in weeks.values())
+        label = labels.get(row_index, "   ")
+        heat_rows.append((label, row))
 
-    glyphs: list[str] = []
-    for col_index, column in enumerate(columns):
-        for row_index, glyph in enumerate(column):
-            x = start_x + col_index * cell_w
-            y = start_y + row_index * cell_h
-            glyphs.append(
-                f'<text x="{x}" y="{y}" fill="{TEXT if glyph != " " else ACCENT_ALT}" font-size="12" '
-                f'font-family="Consolas,\'Liberation Mono\',Menlo,monospace">{escape(glyph)}</text>'
-            )
-
-    labels: list[str] = []
-    first_seen: set[str] = set()
+    month_marks: list[str] = []
+    seen_months: set[str] = set()
+    start_x = 194
     for col_index, week_start in enumerate(weeks.keys()):
-        label = week_start.strftime("%b")
-        if label in first_seen:
+        label = week_start.strftime("%b").lower()
+        if label in seen_months:
             continue
-        first_seen.add(label)
-        labels.append(f'<text x="{start_x + col_index * cell_w}" y="48" fill="{MUTED}" font-size="11">{label}</text>')
+        seen_months.add(label)
+        month_marks.append(
+            f'<text x="{start_x + col_index * 13.4:.2f}" y="482" fill="{MUTED}" font-size="14" font-family="{MONO}">{label}</text>'
+        )
 
-    weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    weekday_labels = [
-        f'<text x="46" y="{start_y + index * cell_h}" fill="{MUTED}" font-size="11">{label}</text>'
-        for index, label in enumerate(weekdays)
-    ]
+    heat_text = []
+    for row_index, (label, row) in enumerate(heat_rows):
+        y = 534 + row_index * 22
+        heat_text.append(
+            f'<text x="144" y="{y}" fill="{MUTED}" font-size="14" font-family="{MONO}">{label}</text>'
+            f'<text x="{start_x}" y="{y}" fill="{TEXT}" font-size="14" font-family="{MONO}" xml:space="preserve">{escape(row)}</text>'
+        )
 
     body = f"""
-  <text x="36" y="32" fill="{MUTED}" font-size="12" letter-spacing="1.1">YEAR / ONE GLYPH PER DAY</text>
-  <text x="36" y="50" fill="{TEXT}" font-size="15" font-weight="700">a contribution heatmap drawn with the same ASCII logic as the portrait</text>
-  {''.join(labels)}
-  {''.join(weekday_labels)}
-  {''.join(glyphs)}
+  <text x="188" y="94" fill="{TEXT}" font-size="42" font-family="{SANS}" font-weight="700">{streaks["current_len"]}</text>
+  <text x="188" y="122" fill="{MUTED}" font-size="16" font-family="{MONO}">current streak</text>
+  <text x="188" y="150" fill="{MUTED}" font-size="16" font-family="{MONO}">{escape(fmt_range(streaks["current_start"], streaks["current_end"])) if streaks["current_len"] else "last active " + escape(f"{last_active.strftime('%b')} {last_active.day}, {last_active.year}" if last_active else "n/a")}</text>
+
+  <line x1="530" y1="62" x2="530" y2="150" stroke="{EDGE}" />
+
+  <text x="576" y="94" fill="{TEXT}" font-size="42" font-family="{SANS}" font-weight="700">{streaks["longest_len"]}</text>
+  <text x="576" y="122" fill="{MUTED}" font-size="16" font-family="{MONO}">longest streak</text>
+  <text x="576" y="150" fill="{MUTED}" font-size="16" font-family="{MONO}">{escape(fmt_range(streaks["longest_start"], streaks["longest_end"]))}</text>
+
+  <text x="188" y="196" fill="{MUTED}" font-size="14" font-family="{MONO}" letter-spacing="1">BY BYTES</text>
+  <text x="870" y="196" fill="{MUTED}" font-size="14" font-family="{MONO}" letter-spacing="1">BY REPOS</text>
+  {''.join(bars)}
+  {''.join(repo_lines)}
+
+  <text x="188" y="438" fill="{MUTED}" font-size="14" font-family="{MONO}" letter-spacing="1">THE YEAR</text>
+  <text x="188" y="462" fill="{MUTED}" font-size="14" font-family="{MONO}">{streaks["active_days"]} of 365 days had a contribution</text>
+  <text x="888" y="462" fill="{MUTED}" font-size="14" font-family="{MONO}">less  {YEAR_RAMP[0]} {YEAR_RAMP[1]} {YEAR_RAMP[2]} {YEAR_RAMP[3]} {YEAR_RAMP[4]} {YEAR_RAMP[5]}  more</text>
+  {''.join(month_marks)}
+  {''.join(heat_text)}
 """
-    svg = build_svg(
-        900,
-        190,
+
+    svg = build_card(
+        width,
+        height,
         body,
-        "Year-at-a-glance card for Arik Chakraborty",
-        "A self-hosted contribution heatmap using ASCII-style glyph intensity.",
+        f"GitHub detail stats for {LOGIN}",
+        "A self-hosted panel showing streaks, language usage, and a one-character-per-day contribution map.",
     )
-    (OUTPUT_DIR / "year.svg").write_text(svg, encoding="utf-8")
+    (OUTPUT_DIR / "details.svg").write_text(svg, encoding="utf-8")
+
+
+def cleanup_old_assets() -> None:
+    for name in ("stats.svg", "streak.svg", "langs.svg", "year.svg"):
+        path = OUTPUT_DIR / name
+        if path.exists():
+            path.unlink()
 
 
 def main() -> None:
@@ -411,13 +457,28 @@ def main() -> None:
     streaks = compute_streaks(contributions)
     language_bytes, repo_counts = fetch_languages(repositories)
 
-    generate_stats_svg(profile, repositories, streaks, contributions)
-    generate_streak_svg(streaks, contributions)
-    generate_languages_svg(language_bytes, repo_counts)
-    generate_year_svg(contributions)
+    generate_hero_svg(profile, repositories, contributions, streaks)
+    generate_details_svg(repositories, streaks, contributions, language_bytes, repo_counts)
+    cleanup_old_assets()
+
+    metadata = {
+        "login": LOGIN,
+        "name": profile.get("name"),
+        "public_repos": profile.get("public_repos"),
+        "followers": profile.get("followers"),
+        "stars": total_stars(repositories),
+        "featured_projects": [
+            {
+                "name": repo.get("name"),
+                "description": repo.get("description"),
+                "language": normalize_language(repo.get("language")),
+            }
+            for repo in top_repositories(repositories)
+        ],
+    }
+    (OUTPUT_DIR / "profile-data.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Wrote generated stats for {LOGIN}")
 
 
 if __name__ == "__main__":
     main()
-

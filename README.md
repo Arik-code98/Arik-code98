@@ -1,47 +1,50 @@
-<div align="center">
-  <img src="assets/generated/portrait.svg" alt="Animated ASCII portrait of Arik Chakraborty" width="460" />
-</div>
-
-> I build practical AI systems, RAG pipelines, and developer tools that turn models into something people can actually use.
-
 <p align="center">
-  <img src="assets/generated/stats.svg" alt="GitHub output card for Arik Chakraborty" width="860" />
+  <img src="assets/generated/hero.svg" alt="Generated GitHub profile hero for Arik Chakraborty" width="1100" />
 </p>
 
 <p align="center">
-  <img src="assets/generated/streak.svg" alt="GitHub streak card for Arik Chakraborty" width="860" />
+  <a href="https://github.com/Arik-code98/Portfolio">portfolio</a>
+  &middot;
+  <a href="https://github.com/Arik-code98/SmartGrocer">smartgrocer</a>
+  &middot;
+  <a href="https://github.com/Arik-code98/langgraph-agent">langgraph-agent</a>
+  &middot;
+  <a href="https://github.com/Arik-code98/codebase-explainer">codebase-explainer</a>
 </p>
+
+## about
+
+> AI builder focused on practical tools, retrieval workflows, and small systems that are easy to ship and easy to inspect.
+
+I like projects that turn model capability into something a real person can actually use. Most of my public work clusters around Python, RAG, lightweight backend APIs, and developer-facing automation.
+
+## stack
+
+<samp>python&nbsp;&nbsp;typescript&nbsp;&nbsp;fastapi&nbsp;&nbsp;streamlit&nbsp;&nbsp;rag&nbsp;&nbsp;agents&nbsp;&nbsp;github-actions&nbsp;&nbsp;automation</samp>
+
+## projects
+
+[Portfolio](https://github.com/Arik-code98/Portfolio) - <samp>typescript</samp><br />
+Personal portfolio website.
+
+[SmartGrocer](https://github.com/Arik-code98/SmartGrocer) - <samp>python</samp><br />
+AI-powered grocery assistant for inventory tracking, expiry reminders, and meal planning.
+
+[langgraph-agent](https://github.com/Arik-code98/langgraph-agent) - <samp>python</samp><br />
+Agent workflow experimentation built around graph-based orchestration.
+
+[codebase-explainer](https://github.com/Arik-code98/codebase-explainer) - <samp>python</samp><br />
+Repository understanding and summarization tooling.
+
+[langchain-rag](https://github.com/Arik-code98/langchain-rag) - <samp>python</samp><br />
+Retrieval-augmented generation patterns and experiments.
+
+## stats
 
 <p align="center">
-  <img src="assets/generated/langs.svg" alt="Language usage card for Arik Chakraborty" width="860" />
+  <img src="assets/generated/details.svg" alt="Generated GitHub profile stats for Arik Chakraborty" width="1100" />
 </p>
 
-<p align="center">
-  <img src="assets/generated/year.svg" alt="Year-at-a-glance contribution card for Arik Chakraborty" width="900" />
-</p>
+## about this page
 
-Everything above is generated from this repository. No third-party profile widgets, no off-repo stat cards, and no dependency on somebody else's theme server staying online.
-
-## Focus
-
-- Building AI products that feel useful, not just impressive in demos.
-- Working across retrieval, agent systems, API backends, and simple frontends.
-- Keeping projects self-hosted, inspectable, and easy to reason about.
-
-## Selected Work
-
-- [Portfolio](https://github.com/Arik-code98/Portfolio) - Personal portfolio website built with TypeScript.
-- [SmartGrocer](https://github.com/Arik-code98/SmartGrocer) - AI grocery assistant for inventory tracking, expiry reminders, and meal planning.
-- [langgraph-agent](https://github.com/Arik-code98/langgraph-agent) - Agent workflow experimentation in Python.
-- [codebase-explainer](https://github.com/Arik-code98/codebase-explainer) - Repository understanding and summarization tooling.
-- [langchain-rag](https://github.com/Arik-code98/langchain-rag) - Retrieval-augmented generation patterns in Python.
-
-## Toolkit
-
-<samp>Python • LangChain • LangGraph • RAG • FastAPI • Streamlit • TypeScript • GitHub Actions</samp>
-
-## Notes
-
-- The portrait is generated from `assets/source/portrait.jpeg`.
-- Stats refresh automatically each day through GitHub Actions.
-- Pinned repositories and the account bio still need to be managed in the GitHub profile UI.
+Everything visual here is generated inside this repository. The portrait comes from `assets/source/portrait.jpeg`, and the stats are rebuilt from public GitHub data by the workflow in `.github/workflows/refresh-profile.yml`.
