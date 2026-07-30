@@ -16,7 +16,7 @@ I like projects that turn model capability into something a real person can actu
 
 ## stack
 
-<samp>python&nbsp;&nbsp;typescript&nbsp;&nbsp;fastapi&nbsp;&nbsp;streamlit&nbsp;&nbsp;rag&nbsp;&nbsp;agents&nbsp;&nbsp;github-actions&nbsp;&nbsp;automation</samp>
+<samp>Python&nbsp;&nbsp;FastAPI&nbsp;&nbsp;LangChain&nbsp;&nbsp;LangGraph&nbsp;&nbsp;rag&nbsp;&nbsp;SQLAlchemy&nbsp;&nbsp;VectorDB&nbsp;&nbsp;Git</samp>
 
 ## projects
 
