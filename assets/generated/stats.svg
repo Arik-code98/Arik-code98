@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="250" viewBox="0 0 860 250" role="img" aria-labelledby="title desc">
+  <title id="title">GitHub output card for Arik Chakraborty</title>
+  <desc id="desc">A self-hosted card showing total contributions, weekly rhythm, and public GitHub account metrics.</desc>
+  <rect width="860" height="250" rx="22" fill="#130f0c" />
+  <rect x="1" y="1" width="858" height="248" rx="21" fill="none" stroke="#2d221c" />
+  
+  <text x="36" y="38" fill="#b39b84" font-size="12" letter-spacing="1.1">GITHUB OUTPUT / LAST 365 DAYS</text>
+  <text x="36" y="102" fill="#f4e6d6" font-size="62" font-weight="700">119</text>
+  <text x="36" y="132" fill="#b39b84" font-size="18">public contributions generated from your own repository</text>
+  <text x="36" y="178" fill="#b39b84" font-size="12">public repos</text><text x="36" y="204" fill="#f4e6d6" font-size="22" font-weight="700">21</text>
+  <text x="196" y="178" fill="#b39b84" font-size="12">stars earned</text><text x="196" y="204" fill="#f4e6d6" font-size="22" font-weight="700">13</text>
+  <text x="336" y="178" fill="#b39b84" font-size="12">followers</text><text x="336" y="204" fill="#f4e6d6" font-size="22" font-weight="700">4</text>
+  <rect x="430" y="54" width="392" height="146" rx="16" fill="#1b1511" stroke="#2d221c" />
+  <text x="456" y="82" fill="#f4e6d6" font-size="16" font-weight="700">weekly rhythm</text>
+  <text x="456" y="104" fill="#b39b84" font-size="13">one year of output, grouped into Sunday-based weeks</text>
+  <line x1="456" y1="152" x2="816" y2="152" stroke="#2d221c" />
+  <polyline fill="none" stroke="#d49a66" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="456.00,152.00 462.92,152.00 469.85,152.00 476.77,152.00 483.69,152.00 490.62,152.00 497.54,152.00 504.46,152.00 511.38,152.00 518.31,152.00 525.23,126.21 532.15,82.00 539.08,93.05 546.00,104.11 552.92,104.11 559.85,115.16 566.77,107.79 573.69,152.00 580.62,152.00 587.54,152.00 594.46,152.00 601.38,152.00 608.31,152.00 615.23,152.00 622.15,152.00 629.08,148.32 636.00,152.00 642.92,126.21 649.85,129.89 656.77,100.42 663.69,148.32 670.62,152.00 677.54,152.00 684.46,152.00 691.38,152.00 698.31,152.00 705.23,152.00 712.15,152.00 719.08,152.00 726.00,152.00 732.92,152.00 739.85,152.00 746.77,152.00 753.69,152.00 760.62,152.00 767.54,152.00 774.46,152.00 781.38,152.00 788.31,152.00 795.23,152.00 802.15,152.00 809.08,152.00 816.00,152.00" />
+  <text x="456" y="178" fill="#b39b84" font-size="12">following</text><text x="456" y="204" fill="#f4e6d6" font-size="22" font-weight="700">6</text>
+  <text x="596" y="178" fill="#b39b84" font-size="12">account age</text><text x="596" y="204" fill="#f4e6d6" font-size="22" font-weight="700">391 days</text>
+  <text x="716" y="178" fill="#b39b84" font-size="12">active weeks</text><text x="716" y="204" fill="#f4e6d6" font-size="22" font-weight="700">12</text>
+
+</svg>
