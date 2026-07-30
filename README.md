@@ -3,13 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Arik-code98/Portfolio">portfolio</a>
+  <a href="https://arikbuilds.netlify.app/">Portfolio</a>
   &middot;
-  <a href="https://github.com/Arik-code98/SmartGrocer">smartgrocer</a>
+  <a href="https://www.linkedin.com/in/arik-chakraborty-8709a5359/">LinkedIn</a>
   &middot;
-  <a href="https://github.com/Arik-code98/langgraph-agent">langgraph-agent</a>
-  &middot;
-  <a href="https://github.com/Arik-code98/codebase-explainer">codebase-explainer</a>
 </p>
 
 ## about
