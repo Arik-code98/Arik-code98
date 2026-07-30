@@ -403,8 +403,8 @@ def generate_hero_svg(profile: dict, repositories: list[dict], contributions: li
   <text x="910" y="694" text-anchor="end" fill="{TEXT}" font-size="28" font-family="{SANS}" font-weight="700">{streaks["best_week"]}</text>
   <text x="910" y="728" text-anchor="end" fill="{MUTED}" font-size="16" font-family="{MONO}">best week</text>
 
-  <line x1="165" y1="705" x2="912" y2="705" stroke="{EDGE}" />
-  {sparkline(weekly_totals, x=165, baseline=705, width=747, height=68)}
+  <line x1="165" y1="720" x2="745" y2="720" stroke="{EDGE}" />
+  {sparkline(weekly_totals, x=165, baseline=720, width=580, height=38)}
 """
 
     svg = build_card(

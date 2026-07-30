@@ -39,12 +39,6 @@ Repository understanding and summarization tooling.
 [langchain-rag](https://github.com/Arik-code98/langchain-rag) - <samp>python</samp><br />
 Retrieval-augmented generation patterns and experiments.
 
-## stats
-
-<p align="center">
-  <img src="assets/generated/details.svg" alt="Generated GitHub profile stats for Arik Chakraborty" width="1100" />
-</p>
-
 ## about this page
 
 Everything visual here is generated inside this repository. The portrait comes from `assets/source/portrait.png`, and the stats are rebuilt by the workflow in `.github/workflows/refresh-profile.yml`.
