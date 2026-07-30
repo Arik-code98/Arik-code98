@@ -346,11 +346,22 @@ def sparkline(points: list[int], *, x: float, baseline: float, width: float, hei
         px = x + (index / max(1, len(points) - 1)) * width
         py = baseline - (value / max_value) * height
         coords.append(f"{px:.2f},{py:.2f}")
-    return (
-        f'<polyline fill="none" stroke="{TEXT}" stroke-width="2.8" stroke-linecap="round" '
-        f'stroke-linejoin="round" opacity="0.92" points="{" ".join(coords)}" />'
-        f'<circle cx="{x + width:.2f}" cy="{baseline - (points[-1] / max_value) * height:.2f}" r="4.5" fill="{TEXT}" />'
-    )
+    points_text = " ".join(coords)
+    end_x = x + width
+    end_y = baseline - (points[-1] / max_value) * height
+    return f"""<polyline fill="none" stroke="{MUTED}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.36" points="{points_text}" />
+  <polyline fill="none" stroke="{TEXT}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" opacity="0.92" points="{points_text}">
+    <animate attributeName="stroke-dashoffset" from="1" to="0" begin="0.25s" dur="1.7s" fill="freeze" />
+  </polyline>
+  <circle cx="{end_x:.2f}" cy="{end_y:.2f}" r="4.5" fill="{MUTED}" opacity="0.5" />
+  <circle cx="{end_x:.2f}" cy="{end_y:.2f}" r="4.5" fill="{TEXT}" opacity="0">
+    <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.85;1" begin="0.25s" dur="1.7s" fill="freeze" />
+  </circle>
+  <circle cx="{end_x:.2f}" cy="{end_y:.2f}" r="4.5" fill="none" stroke="{TEXT}" stroke-width="1.4" opacity="0">
+    <animate attributeName="r" values="4.5;10" begin="2s" dur="1.4s" repeatCount="indefinite" />
+    <animate attributeName="opacity" values="0.6;0" begin="2s" dur="1.4s" repeatCount="indefinite" />
+  </circle>
+"""
 
 
 def top_repositories(repositories: list[dict]) -> list[dict]:
