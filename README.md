@@ -6,7 +6,6 @@
   <a href="https://arikbuilds.netlify.app/">Portfolio</a>
   &middot;
   <a href="https://www.linkedin.com/in/arik-chakraborty-8709a5359/">LinkedIn</a>
-  &middot;
 </p>
 
 ## about
