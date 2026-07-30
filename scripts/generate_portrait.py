@@ -8,7 +8,7 @@ from typing import Iterable
 from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_IMAGE = ROOT / "assets" / "source" / "portrait.jpeg"
+SOURCE_IMAGE = ROOT / "assets" / "source" / "portrait.png"
 OUTPUT_SVG = ROOT / "assets" / "generated" / "portrait.svg"
 
 ASCII_RAMP = " .,:-=+*#%@"
@@ -45,6 +45,21 @@ def color_distance(pixel: tuple[int, int, int], background: tuple[float, float, 
 
 
 def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+    if "A" in image.getbands():
+        alpha = image.getchannel("A")
+        if alpha.getextrema()[0] < 255:
+            bbox = alpha.getbbox()
+            if bbox:
+                left, top, right, bottom = bbox
+                padding_x = int((right - left) * 0.06)
+                padding_top = int((bottom - top) * 0.04)
+                return (
+                    max(0, left - padding_x),
+                    max(0, top - padding_top),
+                    min(image.width, right + padding_x),
+                    bottom,
+                )
+
     rgb = image.convert("RGB")
     width, height = rgb.size
     scale = min(1.0, 420 / max(width, height))
@@ -91,7 +106,7 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     right = min(probe_width - 1, right + int(subject_width * 0.12))
     top = max(0, top - int(subject_height * 0.16))
 
-    # Tighten the lower crop so the face stays dominant instead of the suit.
+    # Keep the portrait focused for photos that include a background.
     face_bottom = top + int(subject_height * 0.70)
     bottom = min(bottom, face_bottom, probe_height - 1)
 
@@ -105,7 +120,24 @@ def find_subject_bbox(image: Image.Image) -> tuple[int, int, int, int]:
 
 
 def preprocess_image(image_path: Path) -> Image.Image:
-    image = Image.open(image_path).convert("RGB")
+    source = Image.open(image_path)
+    cropped = source.crop(find_subject_bbox(source))
+
+    if "A" in source.getbands():
+        canvas = Image.new("RGBA", cropped.size, (255, 255, 255, 255))
+        image = Image.alpha_composite(canvas, cropped.convert("RGBA")).convert("RGB")
+        grayscale = ImageOps.grayscale(image)
+        grayscale = grayscale.filter(ImageFilter.GaussianBlur(radius=0.7))
+        grayscale = ImageOps.autocontrast(grayscale, cutoff=1)
+
+        def tone_curve(value: int) -> int:
+            normalized = value / 255
+            curved = normalized ** 1.7
+            return int(curved * 255)
+
+        return grayscale.point(tone_curve)
+
+    image = source.convert("RGB")
     cropped = image.crop(find_subject_bbox(image))
 
     background = Image.new("RGB", cropped.size, (255, 255, 255))

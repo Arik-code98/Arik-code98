@@ -30,6 +30,7 @@ jobs:
         env:
           GH_LOGIN: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROFILE_TOKEN: ${{ secrets.PROFILE_TOKEN }}
         run: |
           python scripts/generate_portrait.py
           python scripts/generate_stats.py
@@ -46,4 +47,3 @@ jobs:
           git add assets/generated
           git commit -m "profile: refresh generated assets"
           git push
-

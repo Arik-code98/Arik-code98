@@ -47,4 +47,4 @@ Retrieval-augmented generation patterns and experiments.
 
 ## about this page
 
-Everything visual here is generated inside this repository. The portrait comes from `assets/source/portrait.jpeg`, and the stats are rebuilt from public GitHub data by the workflow in `.github/workflows/refresh-profile.yml`.
+Everything visual here is generated inside this repository. The portrait comes from `assets/source/portrait.png`, and the stats are rebuilt by the workflow in `.github/workflows/refresh-profile.yml`.

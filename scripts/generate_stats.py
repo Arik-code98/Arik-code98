@@ -5,7 +5,7 @@ import os
 import re
 import urllib.parse
 import urllib.request
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from collections import Counter, OrderedDict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -153,11 +153,60 @@ def contribution_window() -> tuple[date, date]:
     return today - timedelta(days=364), today
 
 
-def fetch_contributions() -> list[ContributionDay]:
-    start, end = contribution_window()
-    params = urllib.parse.urlencode({"from": start.isoformat(), "to": end.isoformat()})
-    html = get_text(f"https://github.com/users/{LOGIN}/contributions?{params}")
+def fetch_owner_contributions(token: str, start: date, end: date) -> list[ContributionDay]:
+    query = """
+      query($login: String!, $from: DateTime!, $to: DateTime!) {
+        user(login: $login) {
+          contributionsCollection(from: $from, to: $to) {
+            contributionCalendar {
+              weeks {
+                contributionDays {
+                  date
+                  contributionCount
+                }
+              }
+            }
+          }
+        }
+      }
+    """
+    payload = json.dumps(
+        {
+            "query": query,
+            "variables": {
+                "login": LOGIN,
+                "from": f"{start.isoformat()}T00:00:00Z",
+                "to": f"{end.isoformat()}T23:59:59Z",
+            },
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=payload,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "User-Agent": f"{LOGIN}-profile-generator",
+        },
+    )
+    with urllib.request.urlopen(request) as response:
+        data = json.load(response)
 
+    if data.get("errors"):
+        raise RuntimeError("GitHub GraphQL could not read owner contribution data.")
+
+    calendar = data["data"]["user"]["contributionsCollection"]["contributionCalendar"]
+    days = [
+        ContributionDay(day=date.fromisoformat(item["date"]), count=int(item["contributionCount"]))
+        for week in calendar["weeks"]
+        for item in week["contributionDays"]
+    ]
+    if len(days) < 300:
+        raise RuntimeError("GitHub GraphQL returned an incomplete contribution calendar.")
+    return sorted(days, key=lambda item: item.day)
+
+
+def parse_contribution_calendar(html: str) -> list[ContributionDay]:
     pattern = re.compile(
         r'data-date="(?P<date>\d{4}-\d{2}-\d{2})"[^>]*class="ContributionCalendar-day"></td>\s*'
         r'<tool-tip[^>]*>(?P<tooltip>.*?)</tool-tip>',
@@ -170,10 +219,36 @@ def fetch_contributions() -> list[ContributionDay]:
         count = int(count_match.group(1).replace(",", "")) if count_match else 0
         days.append(ContributionDay(day=date.fromisoformat(match.group("date")), count=count))
 
+    return days
+
+
+def fetch_public_contribution_year(year: int) -> list[ContributionDay]:
+    params = urllib.parse.urlencode({"from": f"{year}-01-01", "to": f"{year}-12-31"})
+    html = get_text(f"https://github.com/users/{LOGIN}/contributions?{params}")
+    return parse_contribution_calendar(html)
+
+
+def fetch_contributions() -> list[ContributionDay]:
+    start, end = contribution_window()
+    owner_token = os.environ.get("PROFILE_TOKEN")
+    if owner_token:
+        try:
+            return fetch_owner_contributions(owner_token, start, end)
+        except (HTTPError, URLError, KeyError, RuntimeError) as error:
+            print(f"Owner contribution data unavailable; using public data instead: {error}")
+
+    # The public endpoint accepts one calendar year at a time; combine years before slicing.
+    by_day: dict[date, ContributionDay] = {}
+    for year in range(start.year, end.year + 1):
+        for item in fetch_public_contribution_year(year):
+            if start <= item.day <= end:
+                by_day[item.day] = item
+    days = sorted(by_day.values(), key=lambda item: item.day)
+
     if len(days) < 300:
         raise RuntimeError("Could not parse enough contribution days from GitHub.")
 
-    return sorted(days, key=lambda item: item.day)
+    return days
 
 
 def compute_streaks(days: list[ContributionDay]) -> dict:
@@ -212,7 +287,8 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
 
         previous_day = item.day
 
-    for item in reversed(days):
+    current_days = days[:-1] if days and days[-1].day == date.today() and days[-1].count == 0 else days
+    for item in reversed(current_days):
         if item.count > 0:
             current_len += 1
             current_start = item.day
@@ -227,7 +303,7 @@ def compute_streaks(days: list[ContributionDay]) -> dict:
         "longest_end": longest_end,
         "current_len": current_len,
         "current_start": current_start,
-        "current_end": days[-1].day if current_len else None,
+        "current_end": current_days[-1].day if current_len else None,
         "active_days": active_days,
         "active_weeks": active_weeks,
         "best_week": best_week,
@@ -291,7 +367,8 @@ def top_repositories(repositories: list[dict]) -> list[dict]:
 
 
 def generate_hero_svg(profile: dict, repositories: list[dict], contributions: list[ContributionDay], streaks: dict) -> None:
-    rows = build_ascii_rows()
+    # A smaller grid keeps the complete cutout above the contribution metrics.
+    rows = build_ascii_rows(cols=78)
     defs, portrait_group, portrait_width, portrait_height = render_ascii_layers(
         rows,
         x=0,
@@ -365,7 +442,7 @@ def generate_details_svg(repositories: list[dict], streaks: dict, contributions:
     repo_lines: list[str] = []
     for index, (language, count) in enumerate(repo_counts.most_common(5)):
         y = 228 + index * 48
-        repo_width = min(88, 24 + count * 9)
+        repo_width = min(66, 20 + count * 7)
         repo_lines.append(
             f'<text x="850" y="{y}" fill="{TEXT}" font-size="18" font-family="{MONO}" font-weight="600">{escape(language.lower())}</text>'
             f'<rect x="982" y="{y - 11}" width="{repo_width}" height="12" rx="3" fill="{TEXT}" opacity="0.85" />'
